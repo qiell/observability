@@ -16,6 +16,7 @@ package alertmanager
 
 import (
 	"fmt"
+
 	"gopkg.in/yaml.v3"
 )
 
@@ -56,7 +57,7 @@ func mergeYamlMaps(result *yaml.Node, sources ...*yaml.Node) error {
 			for j := 0; j < len(result.Content); j = j + 2 {
 				resKey := result.Content[j]
 				if srcKey.Value == resKey.Value {
-					result.Content[i+1] = source.Content[j+1]
+					result.Content[j+1] = source.Content[i+1]
 					found = true
 				}
 			}

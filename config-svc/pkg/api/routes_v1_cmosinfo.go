@@ -1,9 +1,10 @@
 package api
 
 import (
-	"github.com/labstack/echo/v4"
 	"net/http"
 	"os/exec"
+
+	"github.com/labstack/echo/v4"
 )
 
 const collectInfoPath = "/collect-information.sh"

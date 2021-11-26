@@ -16,13 +16,14 @@ package api
 
 import (
 	"fmt"
+	"io"
+	"net/http"
+	"os"
+
 	"github.com/couchbase/tools-common/cbvalue"
 	"github.com/couchbaselabs/observability/config-svc/pkg/couchbase"
 	"github.com/couchbaselabs/observability/config-svc/pkg/prometheus"
 	"gopkg.in/yaml.v3"
-	"io"
-	"net/http"
-	"os"
 
 	v1 "github.com/couchbaselabs/observability/config-svc/pkg/api/v1"
 	"github.com/labstack/echo/v4"
@@ -163,12 +164,4 @@ func overwriteFileContents(file *os.File, contents []byte) error {
 		return fmt.Errorf("failed to close Prometheus config: %w", err)
 	}
 	return nil
-}
-
-func (s *Server) GetOpenapiJson(ctx echo.Context) error { //nolint:revive
-	swagger, err := v1.GetSwagger()
-	if err != nil {
-		return err
-	}
-	return ctx.JSONPretty(http.StatusOK, swagger, "\t")
 }

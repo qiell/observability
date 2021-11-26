@@ -31,8 +31,11 @@ func (s *Server) GetAlertsConfiguration(ctx echo.Context) error {
 		Slack: nil,
 	}
 	if cfg.Global.SlackAPIURLFile != "" {
-		result.Slack = &v1.SlackAlertNotificationConfig{ConfiguredExternally: null.BoolFrom(true).Ptr()}
-	} else if cfg.Global.SlackAPIURL != "" {
+		if stat, err := os.Stat(cfg.Global.SlackAPIURLFile); err != nil && stat.Size() > 0 {
+			result.Slack = &v1.SlackAlertNotificationConfig{ConfiguredExternally: null.BoolFrom(true).Ptr()}
+		}
+	}
+	if cfg.Global.SlackAPIURL != "" {
 		result.Slack = &v1.SlackAlertNotificationConfig{WebhookURL: cfg.Global.SlackAPIURL}
 	}
 

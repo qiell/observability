@@ -1,0 +1,441 @@
+= Couchbase User Authentication
+
+[abstract]
+A tutorial for configuring Couchbase user authentication and authorization using the Autonomous Operator.
+
+include::partial$tutorial.adoc[]
+
+== Overview
+
+This tutorial describes how to use the Autonomous Operator to create authenticated users and bind them to specific roles to provide different levels of authorization.
+
+User authentication can be provided by Couchbase itself or an external LDAP service (such as OpenLDAP).
+The Autonomous Operator refers to <<couchbase-authentication>> as the `local` domain, and <<ldap-authentication>> as the `external` domain.
+
+[#couchbase-authentication]
+== Couchbase Authentication
+
+The local Couchbase domain performs internal password management and requires a password to be provided during user creation.
+
+=== Data Writer
+
+==== Create a User Secret
+
+When using Couchbase for authentication, a Kubernetes Secret containing the user password needs to be created.
+
+The following command creates a named secret with `data-writer-password` set as the password:
+
+[source,console]
+----
+cat << EOF | kubectl create -f -
+apiVersion: v1
+kind: Secret
+metadata:
+  name: data-writer-password-secret
+type: Opaque
+data:
+  password: ZGF0YS13cml0ZXItcGFzc3dvcmQ=   # data-writer-password
+EOF
+----
+
+==== Create and Authorize a User
+
+Using the secret from the previous step, create a user and bind it to a set of roles that could be used for basic application development.
+
+This command creates a new user, a new group containing the roles, and a role binding to associate the user to the group:
+
+[source,console]
+----
+cat << EOF | kubectl apply -f -
+apiVersion: couchbase.com/v2
+kind: CouchbaseUser
+metadata:
+  name: data-writer-user <.>
+spec:
+  fullName: "Data Writer User"
+  authDomain: local
+  authSecret: data-writer-password-secret <.>
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseGroup
+metadata:
+  name: data-writer-group <.>
+spec:
+  roles: <.>
+  - name: data_writer
+    bucket: default
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseRoleBinding
+metadata:
+  name: data-writer-group-binding <.>
+spec:
+  subjects:
+  - kind: CouchbaseUser
+    name: data-writer-user
+  roleRef:
+    kind: CouchbaseGroup
+    name: data-writer-group 
+EOF
+----
+
+<.> The new user, with username data-writer-user.
+
+<.> The Secret from the previous step.
+
+<.> The new group, with name data-writer-group.
+
+<.> The couchbase roles that we want to assign to the new user.
+
+<.> The new role binding, with name data-writer-group-binding, binds the new user (data-writer-user) with the new group (data-writer-group).
+
+==== Verification
+
+Using the data_writer role, we can not use the UI to login.
+
+To test that the new user was created and assigned the desired roles, install cli or use sdk and log in as user data-writer-user with password data-writer-password.
+
+Using the cbc tool authenticated using the data-writer-user,create a document in Couchbase: 
+
+[source,console]
+----
+cbc create -u data-writer-user -P data-writer-password mydoc -V '{"key":"value"}' -M upsert -U couchbase://cb-example/default
+----
+
+[console]
+----
+mydoc               Stored. CAS=0x16c89195ffc90000
+                    SYNCTOKEN=183,192710269244489,1
+----
+
+=== Data Reader
+
+==== Create a User Secret
+
+When using Couchbase for authentication, a Kubernetes Secret containing the user password needs to be created.
+
+The following command creates a named secret with `data-reader-password` set as the password:
+
+[source,console]
+----
+cat << EOF | kubectl create -f -
+apiVersion: v1
+kind: Secret
+metadata:
+  name: data-reader-password-secret
+type: Opaque
+data:
+  password: ZGF0YS1yZWFkZXItcGFzc3dvcmQ=   # data-reader-password
+EOF
+----
+
+==== Create and Authorize a User
+
+Using the secret from the previous step, create a user and bind it to a set of roles that could be used for basic application development.
+
+This command creates a new user, a new group containing the roles, and a role binding to associate the user to the group:
+
+[source,console]
+----
+cat << EOF | kubectl apply -f -
+apiVersion: couchbase.com/v2
+kind: CouchbaseUser
+metadata:
+  name: data-reader-user <.>
+spec:
+  fullName: "Data reader User"
+  authDomain: local
+  authSecret: data-reader-password-secret <.>
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseGroup
+metadata:
+  name: data-reader-group <.>
+spec:
+  roles: <.>
+  - name: data_reader
+    bucket: default
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseRoleBinding
+metadata:
+  name: data-reader-group-binding <.>
+spec:
+  subjects:
+  - kind: CouchbaseUser
+    name: data-reader-user
+  roleRef:
+    kind: CouchbaseGroup
+    name: data-reader-group 
+EOF
+----
+
+<.> The new user, with username data-reader-user.
+
+<.> The Secret from the previous step.
+
+<.> The new group, with name data-reader-group.
+
+<.> The couchbase roles that we want to assign to the new user.
+
+<.> The new role binding, with name data-reader-group-binding, binds the new user (data-reader-user) with the new group (data-reader-group).
+
+==== Verification
+
+Using the data_reader role, we can not use the UI to login.
+
+To test that the new user was created and assigned the desired roles, install cli or use sdk and log in as user data-reader-user with password data-reader-password. 
+
+[source,console]
+----
+cbc get mydoc -u data-reader-user -P data-reader-password -U couchbase://cb-example/default
+----
+
+[console]
+----
+mydoc                CAS=0x16c89195ffc90000, Flags=0x0, Size=15, Datatype=0x01(JSON)
+{"key":"value"}
+----
+
+=== Replication Admin
+
+==== Create a User Secret
+
+When using Couchbase for authentication, a Kubernetes Secret containing the user password needs to be created.
+The following command creates a secret with `replication-password` set as the password.
+
+[source,console]
+----
+cat << EOF | kubectl create -f -
+apiVersion: v1
+kind: Secret
+metadata:
+  name: replication-password-secret
+type: Opaque
+data:
+  password: cmVwbGljYXRpb24tcGFzc3dvcmQ=   # replication-password
+EOF
+----
+
+==== Create and Authorize a User
+
+Create a user and bind it to a set of roles which could be used for basic application development.
+The following command creates a new user, a new group containing the roles, and a new role binding to aggregate the user and the group together.
+
+[source,console]
+----
+cat << EOF | kubectl apply -f -
+apiVersion: couchbase.com/v2
+kind: CouchbaseUser
+metadata:
+  name: replication-admin-user <.>
+spec:
+  fullName: "Replication Admin User"
+  authDomain: local
+  authSecret: replication-password-secret <.>
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseGroup
+metadata:
+  name: replication-admin-group <.>
+spec:
+  roles: <.>
+  - name: replication_admin
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseRoleBinding
+metadata:
+  name: replication-admin-group-binding <.>
+spec:
+  subjects:
+  - kind: CouchbaseUser
+    name: replication-admin-user
+  roleRef:
+    kind: CouchbaseGroup
+    name: replication-admin-group 
+EOF
+----
+
+<.> The new user, with username replication-admin-user.
+
+<.> The Secret from the previous step.
+
+<.> The new group, with name replication-admin-group.
+
+<.> The Couchbase roles that we want to assign to the new user.
+
+<.> The new role binding, with name my-group-binding, binds the new user (replication-admin-user) with the new group (replication-admin-group).
+
+
+==== Verification
+
+To test that the new user was created and assigned the desired roles, connect to the Couchbase Web Console and log in as user replication-admin-user with password replication-password.
+
+In the top right corner of the UI, you can verify the username. In the left menu, the XDCR option will be available for this user.
+XDCR allows data to be physically migrated to a new cluster, or replicated to a standby system for disaster recovery or physical locality.
+
+[#ldap-authentication]
+== LDAP Authentication
+
+Couchbase is able to delegate authentication to an external LDAP service.
+Using LDAP for authentication adds an additional level of security and places password management within an external domain.
+
+=== Running an OpenLDAP server
+
+The OpenLDAP service will be created using Helm.
+To seed the service with users and groups, a value override file needs to be created:
+
+[source,console]
+----
+$ echo "
+customLdifFiles:
+  01-default-users.ldif: |-
+    dn: ou=People,dc=example,dc=org
+    objectClass: organizationalUnit
+    ou: People
+
+    dn: uid=jbrown,ou=People,dc=example,dc=org
+    objectclass: top
+    objectclass: person
+    objectclass: organizationalPerson
+    objectclass: inetOrgPerson
+    uid: jbrown
+    cn: James
+    sn: Brown
+    userPassword: password" > ldap-values.yaml
+----
+
+Now run the OpenLDAP server with the custom values in `ldap-values.yaml`:
+
+[source,console]
+----
+# helm 3.1
+$ helm install my-release --set adminPassword=ldappassword -f ldap-values.yaml stable/openldap
+----
+
+Couchbase will communicate with the OpenLDAP server using the service created by the Helm Chart.
+
+Run `helm status` to see the service endpoint:
+
+[source,console]
+----
+$ helm status my-release
+
+NOTES:
+OpenLDAP has been installed. You can access the server from within the k8s cluster using:
+
+  my-release-openldap.default.svc.cluster.local:389
+----
+
+The Couchbase service will also need to authenticate with OpenLDAP in order to query for user records and groups.
+Therefore, a Kubernetes secret will need to be created with the `adminPassword` which has been set to `ldappassword`:
+
+[source,console]
+----
+$ cat << EOF | kubectl create -f -
+---
+apiVersion: v1
+data:
+  password: bGRhcHBhc3N3b3Jk      # ldappassword
+kind: Secret
+metadata:
+  name: ldap-secret
+type: Opaque
+----
+
+=== Edit the `CouchbaseCluster` Resource
+
+The LDAP configuration must be added to the `CouchbaseCluster` resource in order to authenticate external users.
+Add the OpenLDAP service endpoint as one of the hosts along with organizational information required to communicate with the service.
+
+[source,yaml]
+----
+apiVersion: couchbase.com/v2
+kind: CouchbaseCluster
+metadata:
+  name: cb-example
+spec:
+  image: couchbase/server:6.5.0
+  security:
+    rbac:
+      managed: true
+    ldap:
+      hosts:
+      - my-release-openldap.default.svc.cluster.local
+      port: 389
+      encryption: None
+      bindDN: "cn=admin,dc=example,dc=org"
+      bindSecret: ldap-secret
+      userDNMapping:
+        template: "uid=%u,ou=People,dc=example,dc=org"
+   ...
+----
+
+NOTE: In production you will want to set `encryption` to `StartTLS` or `TLS`.
+
+After updating the `CouchbaseCluster` resource, you can test LDAP authentication from the Couchbase Web Console.
+Start by xref:howto-ui.adoc[connecting to the Couchbase Web Console].
+
+[source,console]
+----
+# forward the ui port of a couchbase pod
+$ kubectl port-forward --namespace default <couchbase-pod-name> 8091:8091
+
+# open localhost:8091
+----
+
+After logging in, go to the *Security* view, and click *LDAP*.
+Under "Test User Authentication", enter the username `jbrown` and the password `password`, and then click btn:[Test User Authentication].
+Couchbase Server will map the specified username to an LDAP DN, and perform authentication on the LDAP server.
+If your LDAP configuration is set up correctly, you'll get a notification that the test was successful.
+
+==== Grant Roles to an LDAP User
+
+LDAP users are added to Couchbase using the same steps as <<couchbase-authentication,local users>> except that the `authDomain` is set to `external`.
+
+Create a `CouchbaseUser` resource for the LDAP user:
+
+[source,console]
+----
+$ cat << EOF | kubectl apply -f -
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseUser
+metadata:
+  name: jbrown
+spec:
+  fullName: "James Brown"
+  authDomain: external
+EOF
+----
+
+The next step is to bind the user to a group that contains the roles that you want the user to have.
+If you were to use the same groups and bindings from the <<couchbase-authentication,local users section>>, the command would be as follows:
+
+[source,console]
+----
+$ cat << EOF | kubectl apply -f -
+---
+apiVersion: couchbase.com/v2
+kind: CouchbaseRoleBinding
+metadata:
+  name: my-group-binding
+spec:
+  subjects:
+  - kind: CouchbaseUser
+    name: developer
+  - kind: CouchbaseUser
+    name: admin
+  - kind: CouchbaseUser
+    name: security
+  - kind: CouchbaseUser
+    name: jbrown
+  roleRef:
+    kind: CouchbaseGroup
+    name: my-group
+EOF
+----
+
+If you followed this setup, the LDAP user has the same roles as the other uses, even though it relies on a different authentication path (`external` vs `local`).
+
+You can test authentication/authorization by logging into the Couchbase Web Console with the username `jbrown` and password `password`.

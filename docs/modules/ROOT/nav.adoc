@@ -39,6 +39,8 @@ endif::env-packaged[]
 .Tutorials
 * xref:tutorial-onpremise.adoc[On-premise example]
 * xref:tutorial-kubernetes.adoc[Kubernetes example]
+* xref:tutorial-xdcr.adoc[XDCR example]
+* xref:tutorial-rbac.adoc[RBAC example]
 
 .Further Information
 * xref:prerequisite-and-setup.adoc[Pre-requisites]
